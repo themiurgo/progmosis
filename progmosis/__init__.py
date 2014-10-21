@@ -17,16 +17,17 @@ Options:
 The locations file specifies how the fraction of infected people in each
 region evolves over time.
 
-    time,location,infected_fraction
+    datetime,location,infected_fraction
 
 `infected_fraction` must be between 0 and 1.
 
 The movement file specifies how people move between locations. It is a CSV
 file with the following columns (in no particular order, header mandatory).
 
-    time,user,location
+    datetime,user,location
 
-`time` can be specified as a timestamp, or as "YYYY-MM-DD HH:MM".
+`datetime` can be specified in the format "YYYY-MM-DD" and "YYYY-MM-DD HH:MM",
+depending on the time resolution that is chosen.
 
 """
 from docopt import docopt
