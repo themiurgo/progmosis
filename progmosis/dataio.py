@@ -34,10 +34,10 @@ def parse_location(input_fobj):
         
     return history
 
-def parse_movement(input_fobj):
-    """Parse movement and return a dict of time-ordered lists of tuples.
+def parse_mobility(input_fobj):
+    """Parse mobility and return a dict of time-ordered lists of tuples.
 
-    movement[user] = [(time, location), ...]
+    mobility[user] = [(time, location), ...]
 
     input_fobj -- file object
 
