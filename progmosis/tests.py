@@ -50,5 +50,24 @@ class LocationsTestCase(unittest.TestCase):
 
         self.assertEqual(dataio.parse_location(simple), simple_output)
 
+    def test_swapheaders(self):
+        # todo
+        pass
+
+class MovementTestCase(unittest.TestCase):
+    def test_simple(self):
+        simple = io.StringIO(u"""datetime,user,location,
+        2014-01-01,Antonio,Italy
+        2014-01-01,Veljko,UK
+        2014-01-10,Antonio,USA
+        2014-01-12,Veljko,Slovenia""")
+
+        simple_output = {
+            "Antonio": [(datetime.datetime(2014, 01, 01), "Italy"), (datetime.datetime(2014, 01, 10), "USA")],
+            "Veljko": [(datetime.datetime(2014, 01, 01), "UK"), (datetime.datetime(2014, 01, 12), "Slovenia")]
+        }
+
+        self.assertEqual(dataio.parse_movement(simple), simple_output)
+
 if __name__ == '__main__':
     unittest.main()
