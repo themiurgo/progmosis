@@ -1,13 +1,32 @@
 """progmosis. Individual risk-assessment for disease outbreaks from CDRs.
 
 Usage:
-  progmosis <global_history> <cdrs>
+  progmosis <regions> <movement> <calls>
   progmosis (-h | --help)
   progmosis --version
+
+Arguments:
+  <locations>     Locations file, defines how risk evolves in each place
+  <movement>    Movement file, describes how people move
+  <calls>       Calls file, describes how people call each other
 
 Options:
   -h --help     Show this screen.
   --version -v  Show version.
+
+The locations file specifies how the fraction of infected people in each
+region evolves over time.
+
+    time,location,infected_fraction
+
+`infected_fraction` must be between 0 and 1.
+
+The movement file specifies how people move between locations. It is a CSV
+file with the following columns (in no particular order, header mandatory).
+
+    time,user,location
+
+`time` can be specified as a timestamp, or as "YYYY-MM-DD HH:MM".
 
 """
 from docopt import docopt
