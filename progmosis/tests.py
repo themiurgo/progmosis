@@ -63,7 +63,7 @@ class ComplexSISTestCase(unittest.TestCase):
 
     def test_contagion(self):
         self.italy.people = self.italians
-        SIS = sim.SIS(0.20, 0.30)
+        SIS = sim.SIS(0.20, 0.15)
         SIS.infected.add(self.italians[1])
         SIS.infected.add(self.italians[2])
         LOGGER.debug(len(SIS.infected))
@@ -72,6 +72,14 @@ class ComplexSISTestCase(unittest.TestCase):
             SIS.run_one_round(self.italy, 2)
             LOGGER.debug(len(SIS.infected))
         LOGGER.info("Final number of infected: {0}".format(len(SIS.infected)))
+        self.assertGreater(len(SIS.infected), 1)
+
+        SIS.beta = 0
+        for i in xrange(100):
+            SIS.run_one_round(self.italy, 2)
+        LOGGER.info("Final number of infected: {0}".format(len(SIS.infected)))
+        self.assertLess(len(SIS.infected), 1)
+
 
 class LocationsTestCase(unittest.TestCase):
     # Location file
