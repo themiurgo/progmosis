@@ -25,7 +25,7 @@ def evaluate_risk(movements, f_infected, k=1):
     timestamps = [i[0] for i in movements]
     places = [i[1] for i in movements]
     for i in list(set(places)):
-        assert i in f_infected
+        _ = f_infected[i]
 
     stays = np.diff(timestamps).astype(float)
     tot_stay = sum(stays)
