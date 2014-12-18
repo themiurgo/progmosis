@@ -34,7 +34,7 @@ def evaluate_risk(movements, f_infected, k=1):
 
     stays_locations = zip(places[:-1], stays)
     stays_locations = groupby_sum(stays_locations, lambda x: x[0], lambda x: x[1])
-    print stays_locations
+    #print stays_locations
 
     risk = 0
     for (l1, stayt1), (l2, stayt2) in \
