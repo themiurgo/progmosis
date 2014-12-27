@@ -2,6 +2,7 @@ from __future__ import division
 
 import itertools
 import numpy as np
+import pandas as pd
 
 import operator
 
@@ -22,8 +23,8 @@ def evaluate_risk(movements, f_infected, k=1):
     """
 
     # Convert timestamps to stay lengths
-    timestamps = [i[0] for i in movements]
-    places = [i[1] for i in movements]
+    timestamps, places = zip(*movements)
+
     for i in list(set(places)):
         _ = f_infected[i]
 
@@ -34,7 +35,7 @@ def evaluate_risk(movements, f_infected, k=1):
 
     stays_locations = zip(places[:-1], stays)
     stays_locations = groupby_sum(stays_locations, lambda x: x[0], lambda x: x[1])
-    #print stays_locations
+    print stays_locations
 
     risk = 0
     for (l1, stayt1), (l2, stayt2) in \
@@ -65,6 +66,5 @@ def evaluate_risk(movements, f_infected, k=1):
     if normalization == 0 and risk == 0:
         return 0.0
 
-    # FIXME review normalization
     return risk / normalization
 
