@@ -144,7 +144,7 @@ class MovementTestCase(unittest.TestCase):
             "Veljko": [(datetime.datetime(2014, 01, 01), "UK"), (datetime.datetime(2014, 01, 12), "Slovenia")]
         }
 
-        #self.assertEqual(dataio.parse_movement(simple), simple_output)
+        self.assertEqual(dataio.parse_mobility(simple), simple_output)
 
 if __name__ == '__main__':
     unittest.main()
