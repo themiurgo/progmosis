@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.region {
+	stroke: #555;
+//	fill: #ddc;
+  	stroke-linejoin: round;
+}
+
+.legendText {
+	position:absolute;
+	//top: -4em;
+	//left: 5em;
+    font-size:1em;
+    font-family:"Arial, sans-serif";
+    font-weight: bold;
+  }
+
+div.tooltip {   
+  position: absolute;           
+  text-align: center;           
+  width: 15em;                  
+  height: 2em;                 
+  padding: 2px;             
+  background: #FFFFE0;
+  border: 1px;      
+  border-radius: 8px;           
+  pointer-events: none;         
+  font-size: 12pt;
+  font-family: Helvetica;
+}        
+
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script>
+
+var legend = d3.select('#legend')
+  .append('ul')
+    .attr('class', 'list-inline');
+
+
+var width = window.innerWidth / 2,
+	height = window.innerHeight;
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var div = d3.select("body").append("div")   
+  .attr("class", "tooltip")               
+  .style("opacity", 0);
+
+d3.json("data/senegal-topo.json", function(error, senegal) {
+  if (error) return console.error(error);
+
+  var subunits = topojson.feature(senegal, senegal.objects.senegal);
+  var projection = d3.geo.mercator()
+	.center([-14.62, 14.24])
+	.scale(5000)
+	.translate([width / 2, height / 2]);
+
+  var color = d3.scale.threshold()
+    .domain([.02, .04, .06, .08, .10])
+    .range(["#f2f0f7", "#dadaeb", "#bcbddc", "#9e9ac8", "#756bb1", "#54278f"]);
+
+  var path = d3.geo.path()
+	.projection(projection);
+
+  svg.selectAll(".senegal")
+    .data(topojson.feature(senegal, senegal.objects.senegal).features)
+    .enter().append("path")
+    .attr("class", function(d) { return "region " + d.id; })
+	.attr("fill", function(d) { return color(Math.random()*0.1) })
+    .attr("d", path)
+	.on("mouseover", function(d) {
+	 d3.select(this).transition().duration(300).style("opacity", 0.5);
+	 div.transition().duration(300)
+	 .style("opacity", 1);
+	 div.text(d.id)
+	 .style("left", (d3.event.pageX) + "px")
+	 .style("top", (d3.event.pageY -30) + "px");
+	 })
+  .on("mouseout", function() {
+    d3.select(this)
+    .transition().duration(300)
+    .style("opacity", 1);
+    div.transition().duration(300)
+    .style("opacity", 0);
+  })
+
+
+});
+
+// Legend
+
+legendWidth = 400
+legendHeight = 20
+xMargin = 150
+yMargin = 600
+
+var gradient = svg.append("svg:defs")
+  .append("svg:linearGradient")
+    .attr("id", "gradient")
+    .attr("x1", "0%")
+    //.attr("y1", "0%")
+    .attr("x2", "100%")
+    //.attr("y2", "100%")
+    .attr("spreadMethod", "pad");
+
+gradient.append("svg:stop")
+    .attr("offset", "0%")
+    .attr("stop-color", "#f2f0f7")
+    .attr("stop-opacity", 1);
+
+gradient.append("svg:stop")
+    .attr("offset", "100%")
+    .attr("stop-color", "#54278f")
+    .attr("stop-opacity", 1);
+
+svg.append("text")
+	.attr("class","legendText")
+	.attr("text-anchor", "middle")
+	.attr("x", xMargin)
+	.attr("y", yMargin + legendHeight + 20)
+	.attr("dy",0)
+	.text("0.00");
+
+svg.append("text")
+	.attr("class","legendText")
+	.attr("text-anchor", "middle")
+	.attr("x", legendWidth + xMargin)
+	.attr("y", yMargin + legendHeight + 20)
+	.attr("dy",0)
+	.text("0.10");
+
+svg.append("svg:rect")
+	.attr("x", xMargin)
+	.attr("y", yMargin)
+    .attr("width", legendWidth)
+    .attr("height", legendHeight)
+	.attr("rx", 5)
+	.attr("ry", 5)
+    .style("fill", "url(#gradient)");
+
+  
+
+</script>
