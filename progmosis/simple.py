@@ -37,12 +37,10 @@ D = minutes_day / step
 #assert D==12
 
 epidemic = simulator.SEIR(0.45/D, 1/5.61/D, 1/5.3/D)
-movements = get_movements(itertools.chain.from_iterable((gzip.GzipFile(f) for f in sys.argv[3:])))
-patterns = get_patterns(open(sys.argv[1]))
 #print patterns
 #sys.exit(1)
 initial_conditions = ic(patterns)
-scenario = simulator.D4DScenario(epidemic, movements, patterns, initial_conditions, intervention)
+scenario = simulator.TwoGroupScenario(epidemic)
 
 for i in xrange(60*24*30*2 // step):
     scenario.update()

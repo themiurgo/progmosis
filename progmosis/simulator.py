@@ -6,8 +6,12 @@
 
 """
 from __future__ import division
+
+import csv
+import heapq
 import logging
 import random
+import risk
 import sys
 import profile
 
@@ -19,6 +23,11 @@ import collections
 import datetime
 
 #from toolz.itertoolz import 
+
+def binomial(a, b):
+    #return int(max(a * b, 1))
+    return np.random.binomial(a, b)
+
 
 def peek(iterable):
     iterator = iter(iterable)
@@ -35,8 +44,9 @@ LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.WARNING)
 
 class Population(object):
-    def __init__(self):
+    def __init__(self, label):
         self._people = set()
+        self.label = label
 
     def remove(self, person):
         assert person._population == self
@@ -168,6 +178,7 @@ class TwoGroupScenario(Scenario):
         for i, population in enumerate(self.populations.itervalues()):
             self.epidemic.run_one_round(population)
 
+
 class SEIR(object):
     """This class represents a simple SIS model, which can run on any arbitrary population.
 
@@ -186,10 +197,36 @@ class SEIR(object):
         self.susceptible = set()
         self.recovered = set()
         self.infected_tree = nx.MultiDiGraph()
+        self.populations = set()
+
+    def infos(self):
+        n_exposed_bylocation = collections.defaultdict(int)
+        n_infected_bylocation = collections.defaultdict(int)
+        n_recovered_bylocation = collections.defaultdict(int)
+        for person in self.exposed:
+            n_exposed_bylocation[person.population] += 1
+        for person in self.infected:
+            n_infected_bylocation[person.population] += 1
+        for person in self.recovered:
+            n_recovered_bylocation[person.population] += 1
+        populations = self.populations
+
+        f_infected = {}
+        f_susceptible = {}
+        for population in populations:
+            n = len(population.people)
+            e = n_exposed_bylocation[population]
+            i = n_infected_bylocation[population]
+            r = n_recovered_bylocation[population]
+            s = n - e - i - r
+            f_infected[population.label] = i / n
+            f_susceptible[population.label] = s/n
+        return f_infected, f_susceptible
+
 
     def run_one_round(self, population):
+        self.populations.add(population)
         beta, gamma, sigma = self.beta, self.gamma, self.sigma
-        rand = random.random
         people_pop = population.people
         infected_pop = people_pop.intersection(self.infected)
         exposed_pop = people_pop.intersection(self.exposed)
@@ -206,28 +243,28 @@ class SEIR(object):
         # S -> E
         probability = beta*len(infected_pop) / len(people_pop)
         #print "BETA", probability
-        n_exposed = np.random.binomial(len(susceptible_pop), probability)
+        n_exposed = binomial(len(susceptible_pop), probability)
         #print n_exposed
         try:
             new_exposed = random.sample(susceptible_pop, n_exposed)
         except ValueError: # Sample larger than population
-            print "ERR"
+            #LOGGER.error("ERR")
             new_exposed = susceptible_pop
 
         # E -> I
-        n_infected = np.random.binomial(len(exposed_pop), sigma)
+        n_infected = binomial(len(exposed_pop), sigma)
         try:
             new_infected = random.sample(exposed_pop, n_infected)
         except ValueError: # Sample larger than population
-            print "ERR"
+            #LOGGER.error("ERR")
             new_infected = exposed_pop
 
         # I -> R
-        n_recovered = np.random.binomial(len(infected_pop), gamma)
+        n_recovered = binomial(len(infected_pop), gamma)
         try:
             new_recovered = random.sample(infected_pop, n_recovered)
         except ValueError: # Sample larger than population
-            print "ERR"
+            LOGGER.error("ERR")
             new_recovered = infected_pop
         #print "NEW Population {}: {} {} {}".format(
         #        map(len, [new_exposed, new_infected, new_recovered]))
@@ -240,47 +277,174 @@ class SEIR(object):
         self.recovered.update(new_recovered)
         self.infected.difference_update(new_recovered)
 
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return itertools.izip(a, b)
+
 class PeopleMover(object):
-    def __init__(self, people_byid, movements, time_step=datetime.timedelta(10)):
+    def __init__(self, people_byid, location_byid, movements, time_step=datetime.timedelta(hours=2)):
         """Initialize the mover.
 
         Arguments:
           movements -- iterator which returns (timestamp, user, position)
 
         """
-        self.current_time, self.movements = peek(movements)
+        (_, self.current_time, _), self.movements = peek(movements)
         self.people_byid = people_byid
+        self.location_byid = location_byid
         self.time_step = time_step
+        self.inhibited = set() # People who can't move
+
+    def inhibit(self, user_ids, locations):
+        location_byid = self.location_byid
+        people_byid = self.people_byid
+        if locations:
+            for user_id, location_id in itertools.izip(user_ids, locations):
+                location = location_byid[location_id]
+                people_byid[user_id].join_population(location)
+        self.inhibited.update(user_ids)
+        LOGGER.warning("People inhibited {}".format(len(self.inhibited)))
 
     def process_next(self):
-        time, movement = next(self.movements)
-        until_time = time + self.time_step
-        while time < until_time:
-            user, time, location = next(self.movements)
-            self.people_byid[person_id].join_population()
+        #LOGGER.warning("Movement")
+        until_time = self.current_time + self.time_step
+        #print until_time
+        movements = self.movements
+        inhibited = self.inhibited
+        location_byid = self.location_byid
+        people_byid = self.people_byid
+
+        for user_id, time, location in movements:
+            if time >= until_time:
+                self.current_time = until_time
+                self.movements = itertools.chain([(user_id, time, location)], self.movements)
+                break
+
+            user_id, time, location_id = next(movements)
+            if user_id in inhibited:
+            #    LOGGER.warning("Inhibited")
+                continue
+            #LOGGER.warning("Person {} to {}".format(user_id, location_id))
+            location = location_byid[location_id]
+            people_byid[user_id].join_population(location)
+
 
 class Scenario(object):
     def __init__(self, *args, **kwargs):
         raise NotImplementedError
 
 class D4DScenario(object):
-    def __init__(self, epidemic, movements, initial_conditions):
+    def __init__(self, epidemic, movements, patterns, initial_conditions, intervention=None):
+        if not intervention:
+            intervention = "none"
+        else:
+            assert intervention in ("none", "random", "risk")
+            if intervention == "risk":
+                assert patterns
+
         # From movement patterns infer initial location
-        self.populations = {i: Population() for i in xrange(1, 124)}
+        self.epidemic = epidemic
+        self.populations = {i: Population(i) for i in xrange(1, 124)}
         self.people_byid = {}
         for user_id, location in initial_conditions:
             person = Person(user_id)
             self.people_byid[user_id] = person
-            person.join_population(self.populations[pop_id])
-        self.people_mover = PeopleMover(self.people_byid, movements)
+            person.join_population(self.populations[location])
+        self.people_mover = PeopleMover(self.people_byid, self.populations, movements)
+        #np.random.seed(12292014)
+        self.random_risk = random.Random()
+        #self.random_risk.seed("Risk")
+        self.random_epidemic = random.Random()
+        #self.random_epidemic.seed("Epidemic")
+        population = self.populations[119]
+        for _ in xrange(100):
+            #person = random.choice(self.people_byid.values())
+            person = self.random_epidemic.choice(list(population.people))
+            self.epidemic.infected.add(person)
+        self.patterns = patterns
+        self.intervention = intervention
+        self.writer = csv.writer(sys.stdout)
+        self.writer.writerow(["time", "location", "susceptible", "exposed", "infected", "recovered", "total", "inhibited"])
 
     def update(self):
+        ep = self.epidemic
+        # Intervention step
+        probability = 0.18#*len(ep.infected) / 140000
+        #print "BETA", probability
+        #n_exposed = binomial(len(ep.infected), probability)
+        n_exposed = int(max(probability*len(ep.infected), 1))
+        moving = set(self.people_byid.keys())
+        moving.difference_update(self.people_mover.inhibited)
+        moving = list(moving)
+        if self.intervention == "random":
+            n = n_exposed
+            f_infected, f_susceptible = ep.infos()
+            if f_infected and f_susceptible:
+                new_inhibited = self.random_risk.sample(moving, n)
+                locations = [max(self.patterns[person].iteritems(), key=lambda x: x[1])[0]
+                        for person in new_inhibited]
+                self.people_mover.inhibit(new_inhibited, locations)
+        elif self.intervention == "risk":
+            pbyid = self.people_byid
+            patterns = self.patterns
+            evaluate_risk = risk.evaluate_risk
+            f_infected, f_susceptible = ep.infos()
+            LOGGER.warning("IS {}\n{}".format(f_infected.values(), f_susceptible.values()))
+            #LOGGER.warning("{} {} {}".format(moving[1] in self.patterns, moving[1], self.pattern.keys()))
+            if f_infected and f_susceptible:
+                risks = {user_id: evaluate_risk(patterns[user_id].items(),
+                        f_infected, f_susceptible)
+                    for user_id in moving
+                }
+                LOGGER.warning("Maximum risk: {}".format(max(risks.itervalues())))
+                new_inhibited_ids = sorted(risks.iteritems(), key=lambda x: x[1], reverse=True)[:n_exposed]
+                #LOGGER.warning("{}".format(new_inhibited_ids))
+                new_inhibited_ids = [i[0] for i in new_inhibited_ids]
+                locations = [max(self.patterns[user_id].iteritems(), key=lambda x: x[1])[0]
+                        for user_id in new_inhibited_ids]
+                self.people_mover.inhibit(new_inhibited_ids, locations)
+
         # Movement step
         self.people_mover.process_next()
 
         # Epidemic step
         for i, population in enumerate(self.populations.itervalues()):
             self.epidemic.run_one_round(population)
+
+    def log(self, time_label):
+        n_exposed_bylocation = collections.defaultdict(int)
+        n_infected_bylocation = collections.defaultdict(int)
+        n_recovered_bylocation = collections.defaultdict(int)
+        ep = self.epidemic
+        for person in ep.exposed:
+            n_exposed_bylocation[person.population] += 1
+        for person in ep.infected:
+            n_infected_bylocation[person.population] += 1
+        for person in ep.recovered:
+            n_recovered_bylocation[person.population] += 1
+        populations = ep.populations
+        tot_n = 0
+        writer = self.writer
+
+        inhibited = self.people_mover.inhibited
+        for population in populations:
+            n = len(population.people)
+            tot_n += n
+            e = n_exposed_bylocation[population]
+            i = n_infected_bylocation[population]
+            r = n_recovered_bylocation[population]
+            s = n - e - i - r
+            user_ids = [p.label for p in population.people]
+            ih = inhibited.intersection(user_ids)
+            writer.writerow(map(str, [time_label, population.label, s, e, i, r, n, len(ih)]))
+        e = len(ep.exposed)
+        i = len(ep.infected)
+        r = len(ep.recovered)
+        n = tot_n
+        s = n - e - i - r
+        writer.writerow(map(str, [time_label, -1, s, e, i, r, n, len(inhibited)]))
 
 
 class TwoGroupScenario(Scenario):
@@ -305,7 +469,6 @@ class TwoGroupScenario(Scenario):
              movement_stochastic(p3)]
 
         self.epidemic = epidemic
-        self.epidemic.infected.add(random.choice(self.people.values()))
 
         self.person_movements = {}
         for pid, person in self.people.iteritems():
