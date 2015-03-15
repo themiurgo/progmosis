@@ -14,6 +14,7 @@ def get_movements(fobj):
 
 def get_ic(fobj):
     reader = csv.reader(fobj)
+    next(reader)
     for user_id, time, _ in reader:
         yield int(user_id), int(location)
 

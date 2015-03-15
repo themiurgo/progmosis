@@ -273,6 +273,8 @@ class D4DScenario(object):
             self.people_byid[user_id] = person
             person.join_population(self.populations[pop_id])
         self.people_mover = PeopleMover(self.people_byid, movements)
+        # Infect one random person
+        self.epidemic.infected.add(random.choice(self.people_byid.values()))
 
     def update(self):
         # Movement step
@@ -300,22 +302,32 @@ class TwoGroupScenario(Scenario):
                 else:
                     yield 1
 
-        self.movement_patterns = [movement_stochastic(p1),
-             movement_stochastic(p2),
-             movement_stochastic(p3)]
+        self.movement_patterns = [movement_stochastic(p1), # Always in 0
+             movement_stochastic(p2), #Always in 1
+             movement_stochastic(p3) # 1 and 2
+             ]
 
         self.epidemic = epidemic
-        self.epidemic.infected.add(random.choice(self.people.values()))
+        # Add always from the first population, to be able to repeat the
+        # experiment and have sense when computing confidence intervals
+        patient_zero = random.choice(self.people.values())
+        self.epidemic.infected.add(patient_zero)
 
         self.person_movements = {}
         for pid, person in self.people.iteritems():
+            # Make sure the patient zero comes from the same place
+            if person == patient_zero:
+                self.person_movements[pid] = self.movement_patterns[1]
+                continue
             dice = random.random()
             if dice < f3:
                 self.person_movements[pid] = self.movement_patterns[2]
-            elif dice < 0.5+f3/2:
-                self.person_movements[pid] = self.movement_patterns[1]
             else:
-                self.person_movements[pid] = self.movement_patterns[0]
+                dice = random.random()
+                if dice < 0.5:
+                    self.person_movements[pid] = self.movement_patterns[1]
+                else:
+                    self.person_movements[pid] = self.movement_patterns[0]
         self.history = collections.defaultdict(list)
 
     def update(self):
